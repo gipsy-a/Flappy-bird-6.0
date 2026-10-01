@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Jarak Pipa</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: #70c5ce;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let gameStarted = false;
+let score = 0;
+let highscore = localStorage.getItem("highscore") ? parseInt(localStorage.getItem("highscore")) : 0;
+
+// =========================================================================
+// PENGATURAN JARAK PIPA (UBAH ANGKA DI SINI)
+// =========================================================================
+const HORIZONTAL_PIPE_SPACING = 250; // Jarak horizontal antar tiang (Makin besar = makin renggang/jauh)
+const VERTICAL_PIPE_GAP = 130;       // Celah vertikal untuk burung lewat (Makin besar = makin lebar)
+
+const bird = {
+    x: 50,
+    y: 300,
+    radius: 14,
+    gravity: 0.4,
+    velocity: 0,
+    jump: -6.5,
+    draw: function() {
+        // --- 1. BIRD BODY ---
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff4444";
+        ctx.fill();
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.closePath();
+
+        // --- 2. EYES ---
+        ctx.beginPath();
+        ctx.arc(this.x + 6, this.y - 4, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.beginPath();
+        ctx.arc(this.x + 7, this.y - 4, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#000";
+        ctx.fill();
+        ctx.closePath();
+
+        // --- 3. YELLOW BEAK ---
+        ctx.beginPath();
+        ctx.moveTo(this.x + 12, this.y - 2);
+        ctx.lineTo(this.x + 24, this.y + 2);
+        ctx.lineTo(this.x + 12, this.y + 6);
+        ctx.fillStyle = "#ffff00";
+        ctx.fill();
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.closePath();
+
+        // --- 4. DETAILED WING ON TOP ---
+        ctx.save();
+        ctx.translate(this.x - 3, this.y + 1);
+        
+        let flapAngle = this.velocity * 0.08;
+        ctx.rotate(flapAngle);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0); 
+        ctx.quadraticCurveTo(-10, -18, -20, -10); 
+        ctx.quadraticCurveTo(-18, -2, -10, 4);   
+        ctx.quadraticCurveTo(-4, 4, 0, 0);    
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.closePath();
+        
+        ctx.restore(); 
+    }
+};
+
+const pipes = [];
+const pipeWidth = 60;
+const pipeSpeed = 1.5;
+
+// Diatur dari variabel di atas
+const pipeGap = VERTICAL_PIPE_GAP; 
+
+// --- DYNAMIC CLOUDS MANAGEMENT ---
+const clouds = [];
+function spawnCloud(initialX = canvas.width) {
+    clouds.push({
+        x: initialX,
+        y: Math.floor(Math.random() * 120) + 30,
+        speed: Math.random() * 0.4 + 0.2,
+        scale: Math.random() * 0.4 + 0.7
+    });
+}
+
+spawnCloud(40);
+spawnCloud(180);
+spawnCloud(320);
+
+function spawnPipe() {
+    const minHeight = 50;
+    const maxHeight = canvas.height - pipeGap - minHeight;
+    const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+    pipes.push({
+        x: canvas.width,
+        top: topHeight,
+        passed: false
+    });
+}
+
+function resetGame() {
+    score = 0;
+    bird.y = 300;
+    bird.velocity = 0;
+    pipes.length = 0;
+    gameStarted = false;
+    
+    clouds.length = 0;
+    spawnCloud(40);
+    spawnCloud(180);
+    spawnCloud(320);
+}
+
+function handleControl() {
+    if (!gameStarted) {
+        gameStarted = true;
+    }
+    bird.velocity = bird.jump;
+}
+
+window.addEventListener("keydown", function(e) {
+    if (e.code === "Space") handleControl();
+});
+
+canvas.addEventListener("touchstart", function(e) {
+    e.preventDefault();
+    handleControl();
+});
+
+canvas.addEventListener("mousedown", handleControl);
+
+function drawFlatRetroPipe(x, y, width, height, isTop) {
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#000000";
+
+    ctx.fillStyle = "#73bf2e"; 
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeRect(x, y, width, height);
+
+    const capHeight = 24;
+    const capExtraWidth = 5; 
+    const capX = x - capExtraWidth;
+    const capWidth = width + (capExtraWidth * 2);
+    let capY = isTop ? (y + height - capHeight) : y;
+
+    ctx.fillStyle = "#73bf2e";
+    ctx.fillRect(capX, capY, capWidth, capHeight);
+    ctx.strokeRect(capX, capY, capWidth, capHeight);
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "#70c5ce";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    for (let i = clouds.length - 1; i >= 0; i--) {
+        let cloud = clouds[i];
+        cloud.x -= cloud.speed; 
+
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(cloud.x, cloud.y, 30 * cloud.scale, 0, Math.PI * 2);
+        ctx.arc(cloud.x + (40 * cloud.scale), cloud.y - (10 * cloud.scale), 40 * cloud.scale, 0, Math.PI * 2);
+        ctx.arc(cloud.x + (80 * cloud.scale), cloud.y, 30 * cloud.scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.closePath();
+
+        if (cloud.x + (120 * cloud.scale) < 0) {
+            clouds.splice(i, 1);
+            spawnCloud(); 
+        }
+    }
+
+    if (gameStarted) {
+        bird.velocity += bird.gravity;
+        bird.y += bird.velocity;
+
+        if (bird.y + bird.radius >= canvas.height || bird.y - bird.radius <= 0) {
+            resetGame();
+        }
+
+        // =========================================================================
+        // PENGATURAN LOGIKA JARAK HORIZONTAL (MENGGUNAKAN VARIABEL DI ATAS)
+        // =========================================================================
+        if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - HORIZONTAL_PIPE_SPACING) {
+            spawnPipe();
+        }
+
+        for (let i = pipes.length - 1; i >= 0; i--) {
+            pipes[i].x -= pipeSpeed;
+
+            const bottomPipeY = pipes[i].top + pipeGap;
+            const bottomPipeHeight = canvas.height - bottomPipeY;
+
+            drawFlatRetroPipe(pipes[i].x, 0, pipeWidth, pipes[i].top, true);
+            drawFlatRetroPipe(pipes[i].x, bottomPipeY, pipeWidth, bottomPipeHeight, false);
+
+            if (
+                bird.x + bird.radius > pipes[i].x &&
+                bird.x - bird.radius < pipes[i].x + pipeWidth
+            ) {
+                if (bird.y - bird.radius < pipes[i].top || bird.y + bird.radius > bottomPipeY) {
+                    resetGame();
+                    break;
+                }
+            }
+
+            if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+                pipes[i].passed = true;
+                score++;
+                if (score > highscore) {
+                    highscore = score;
+                    localStorage.setItem("highscore", highscore);
+                }
+            }
+
+            if (pipes[i].x + pipeWidth < 0) {
+                pipes.splice(i, 1);
+            }
+        }
+    } else {
+        ctx.fillStyle = "#fff";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Tekan Layar/Spasi untuk Mulai", canvas.width / 2, canvas.height / 2);
+    }
+
+    bird.draw();
+
+    ctx.fillStyle = "#fff";
+    ctx.lineWidth = 4;
+    ctx.font = "bold 30px Arial";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "#000";
+    ctx.strokeText(score, canvas.width / 2, 50);
+    ctx.fillText(score, canvas.width / 2, 50);
+
+    if (highscore > 0) {
+        ctx.font = "bold 16px Arial";
+        ctx.strokeText("Highscore: " + highscore, canvas.width / 2, 85);
+        ctx.fillText("Highscore: " + highscore, canvas.width / 2, 85);
+    }
+
+    requestAnimationFrame(update);
+}
+
+update();
+</script>
+</body>
+</html>
