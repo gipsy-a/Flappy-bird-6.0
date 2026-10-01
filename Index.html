@@ -215,9 +215,8 @@ function update() {
         bird.velocity += bird.gravity;
         bird.y += bird.velocity;
 
-        if (bird.y + bird.radius >= canvas.height <=0)
-        if (bird.y - bird.radius <= 0) {
-            resetGame();
+        
+    if (bird.y - bird.radius <= 0) resetGame();
         }
 
         // =========================================================================
