@@ -216,9 +216,13 @@ function update() {
         bird.y += bird.velocity;
 
         
-    if (bird.y - bird.radius <= 0) resetGame();
-        }
+    
+        if (bird.y - bird.radius < 0) {
+            bird.y = bird.radius;
+            bird.velocity = 0;
 
+        if (bird.y + bird.radius >= canvas.height) {
+            resetGame()
         // =========================================================================
         // PENGATURAN LOGIKA JARAK HORIZONTAL (MENGGUNAKAN VARIABEL DI ATAS)
         // =========================================================================
